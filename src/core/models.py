@@ -43,12 +43,13 @@ class TokenStats(BaseModel):
     token_id: int
     image_count: int = 0
     video_count: int = 0
-    error_count: int = 0
+    error_count: int = 0  # Historical total errors (never reset)
     last_error_at: Optional[datetime] = None
     today_image_count: int = 0
     today_video_count: int = 0
     today_error_count: int = 0
     today_date: Optional[str] = None
+    consecutive_error_count: int = 0  # Consecutive errors for auto-disable
 
 class Task(BaseModel):
     """Task model"""

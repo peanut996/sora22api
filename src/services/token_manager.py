@@ -913,12 +913,12 @@ class TokenManager:
     async def record_error(self, token_id: int):
         """Record token error"""
         await self.db.increment_error_count(token_id)
-        
+
         # Check if should ban
         stats = await self.db.get_token_stats(token_id)
         admin_config = await self.db.get_admin_config()
-        
-        if stats and stats.error_count >= admin_config.error_ban_threshold:
+
+        if stats and stats.consecutive_error_count >= admin_config.error_ban_threshold:
             await self.db.update_token_status(token_id, False)
     
     async def record_success(self, token_id: int, is_video: bool = False):

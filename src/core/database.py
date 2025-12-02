@@ -204,6 +204,20 @@ class Database:
                         except Exception as e:
                             print(f"  ✗ Failed to add column '{col_name}': {e}")
 
+            # Check and add missing columns to token_stats table
+            if await self._table_exists(db, "token_stats"):
+                columns_to_add = [
+                    ("consecutive_error_count", "INTEGER DEFAULT 0"),
+                ]
+
+                for col_name, col_type in columns_to_add:
+                    if not await self._column_exists(db, "token_stats", col_name):
+                        try:
+                            await db.execute(f"ALTER TABLE token_stats ADD COLUMN {col_name} {col_type}")
+                            print(f"  ✓ Added column '{col_name}' to token_stats table")
+                        except Exception as e:
+                            print(f"  ✗ Failed to add column '{col_name}': {e}")
+
             # Check and add missing columns to admin_config table
             if await self._table_exists(db, "admin_config"):
                 columns_to_add = [
@@ -291,6 +305,7 @@ class Database:
                     today_video_count INTEGER DEFAULT 0,
                     today_error_count INTEGER DEFAULT 0,
                     today_date DATE,
+                    consecutive_error_count INTEGER DEFAULT 0,
                     FOREIGN KEY (token_id) REFERENCES tokens(id)
                 )
             """)
@@ -825,7 +840,7 @@ class Database:
             await db.commit()
     
     async def increment_error_count(self, token_id: int):
-        """Increment error count"""
+        """Increment error count (both total and consecutive)"""
         from datetime import date
         async with aiosqlite.connect(self.db_path) as db:
             today = str(date.today())
@@ -838,16 +853,18 @@ class Database:
                 await db.execute("""
                     UPDATE token_stats
                     SET error_count = error_count + 1,
+                        consecutive_error_count = consecutive_error_count + 1,
                         today_error_count = 1,
                         today_date = ?,
                         last_error_at = CURRENT_TIMESTAMP
                     WHERE token_id = ?
                 """, (today, token_id))
             else:
-                # Same day, just increment both
+                # Same day, just increment all counters
                 await db.execute("""
                     UPDATE token_stats
                     SET error_count = error_count + 1,
+                        consecutive_error_count = consecutive_error_count + 1,
                         today_error_count = today_error_count + 1,
                         today_date = ?,
                         last_error_at = CURRENT_TIMESTAMP
@@ -856,10 +873,10 @@ class Database:
             await db.commit()
     
     async def reset_error_count(self, token_id: int):
-        """Reset error count"""
+        """Reset consecutive error count (keep total error_count)"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
-                UPDATE token_stats SET error_count = 0 WHERE token_id = ?
+                UPDATE token_stats SET consecutive_error_count = 0 WHERE token_id = ?
             """, (token_id,))
             await db.commit()
     
